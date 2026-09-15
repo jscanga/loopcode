@@ -1,0 +1,79 @@
+// LoopCode data model.
+//
+// The app is single-user (no auth), so there is one implicit learner and
+// exactly one UserProgress row per Problem. Pattern mastery is *derived* from
+// aggregate progress (see src/lib/mastery.ts) rather than stored, so it always
+// reflects the latest reviews.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A coding-interview problem the learner practices on LeetCode/NeetCode.
+/// LoopCode never runs code — it only tracks the link and the recall pattern.
+model Problem {
+  id         String   @id @default(cuid())
+  title      String
+  url        String
+  /// One of the 8 core patterns, e.g. "Two Pointers", "Dynamic Programming".
+  pattern    String
+  /// "easy" | "medium" | "hard"
+  difficulty String
+  createdAt  DateTime @default(now())
+
+  progress   UserProgress?
+  reviews    ReviewLog[]
+
+  @@index([pattern])
+}
+
+/// One immutable entry per review. Stores the rating and the scheduling state
+/// that SM-2 produced *as a result of* that review — useful for the retention
+/// trend chart and for auditing how the schedule evolved.
+model ReviewLog {
+  id           String   @id @default(cuid())
+  problemId    String
+  problem      Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  /// "again" | "hard" | "good" | "easy"
+  rating       String
+  /// SM-2 quality score 0-5 that `rating` mapped to.
+  quality      Int
+  /// Interval (days) SM-2 assigned after this review.
+  intervalDays Int
+  /// Ease factor after this review.
+  easeFactor   Float
+  /// XP awarded for this review.
+  xp           Int      @default(0)
+
+  reviewedAt   DateTime @default(now())
+
+  @@index([problemId])
+  @@index([reviewedAt])
+}
+
+/// Current spaced-repetition state for a Problem (one row per problem).
+model UserProgress {
+  id             String    @id @default(cuid())
+  problemId      String    @unique
+  problem        Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  /// Current interval in days between reviews.
+  intervalDays   Int       @default(0)
+  /// SM-2 ease factor. Starts at 2.5 and drifts with performance (floor 1.3).
+  easeFactor     Float     @default(2.5)
+  /// Number of successful repetitions in a row (resets to 0 on "Again").
+  repetitions    Int       @default(0)
+  /// When this problem next becomes due. New problems are due immediately.
+  nextReviewDate DateTime  @default(now())
+  lastReviewedAt DateTime?
+
+  createdAt      DateTime  @default(now())
+
+  @@index([nextReviewDate])
+}
