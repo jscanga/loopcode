@@ -18,7 +18,8 @@
     "db:setup": "npm run db:setup --workspace server",
     "db:seed": "npm run db:seed --workspace server",
     "db:reset": "npm run db:reset --workspace server",
-    "postinstall": "npm run db:setup --workspace server || echo \"[loopcode] db:setup will run on first dev start\""
+    "db:sql": "npm run db:sql --workspace server",
+    "postinstall": "npm run generate --workspace server || echo \"[loopcode] prisma generate will run during build\""
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

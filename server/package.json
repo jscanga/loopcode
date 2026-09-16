@@ -5,7 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "node scripts/ensure-env.mjs && prisma generate && prisma db push --skip-generate && tsx watch src/index.ts",
+    "dev": "node scripts/ensure-env.mjs && prisma generate && prisma db push --skip-generate && tsx prisma/bootstrap.ts && tsx watch src/index.ts",
+    "generate": "prisma generate",
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -14,9 +15,12 @@
     "db:setup": "node scripts/ensure-env.mjs && prisma generate && prisma db push --skip-generate && npm run db:seed",
     "db:push": "node scripts/ensure-env.mjs && prisma db push",
     "db:seed": "node scripts/ensure-env.mjs && tsx prisma/seed.ts",
-    "db:reset": "node scripts/ensure-env.mjs && prisma db push --force-reset --skip-generate && npm run db:seed"
+    "db:reset": "node scripts/ensure-env.mjs && prisma db push --force-reset --skip-generate && npm run db:seed",
+    "db:sql": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script"
   },
   "dependencies": {
+    "@libsql/client": "^0.8.0",
+    "@prisma/adapter-libsql": "^5.22.0",
     "@prisma/client": "^5.22.0",
     "cors": "^2.8.5",
     "express": "^4.21.2"

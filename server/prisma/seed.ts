@@ -10,10 +10,8 @@
  * Run with:  npm run db:seed
  */
 
-import { PrismaClient } from "@prisma/client";
 import { simulateStudyHistory } from "../src/lib/studyHistory.js";
-
-const prisma = new PrismaClient();
+import { prisma } from "../src/db.js";
 
 interface SeedProblem {
   title: string;
@@ -81,7 +79,7 @@ const PROBLEMS: SeedProblem[] = [
   { title: "N-Queens", url: "https://leetcode.com/problems/n-queens/", pattern: "Backtracking", difficulty: "hard" },
 ];
 
-async function main() {
+export async function seedDatabase() {
   console.log("[seed] Resetting database…");
   await prisma.reviewLog.deleteMany();
   await prisma.userProgress.deleteMany();
@@ -138,11 +136,18 @@ async function main() {
   );
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Run directly (npm run db:seed) → wipe and re-seed. Guarded so that importing
+// `seedDatabase` (e.g. from bootstrap.ts) does NOT trigger a reseed.
+import { pathToFileURL } from "node:url";
+const invokedDirectly =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  seedDatabase()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

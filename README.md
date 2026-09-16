@@ -54,7 +54,7 @@ the approach, and the app schedules the next review.
 | --------- | ------------------------------------------------- |
 | Frontend  | React + TypeScript, Vite, React Router, Recharts  |
 | Backend   | Node + Express (TypeScript, ESM)                  |
-| Database  | SQLite via Prisma ORM                             |
+| Database  | SQLite via Prisma ORM (local file; Turso/libSQL in prod) |
 | Testing   | Vitest (scheduling logic + aggregations)          |
 
 No authentication: LoopCode is single-user by design, which keeps the focus on
@@ -71,10 +71,11 @@ npm run dev      # starts the API (:4000) and the web app (:5173) together
 
 Then open **http://localhost:5173**.
 
-> `npm install` runs a `postinstall` that generates the Prisma client and seeds
-> the database with 40 problems and a simulated 3-week study history, so the
-> dashboard, streak, and mastery map have real data on first launch. If your
-> environment blocks that step, just run `npm run db:setup` once manually.
+> `npm install` generates the Prisma client; the first `npm run dev` creates the
+> local SQLite database and **seeds it with 40 problems and a simulated 3-week
+> study history** (only if it's empty), so the dashboard, streak, and mastery map
+> have real data on first launch. Restarting the dev server never wipes your
+> data — use `npm run db:reset` to force a fresh seed.
 
 Other useful scripts:
 
@@ -153,14 +154,18 @@ it was last reviewed.
 ```
 loopcode/
 ├── package.json            # npm workspaces + one-command dev (concurrently)
-├── render.yaml             # Render deploy blueprint (API + static web)
+├── vercel.json             # Vercel-native deploy (static client + /api function)
+├── api/
+│   └── [...path].ts         # Vercel serverless entry → serves the Express app
 ├── server/                 # Express + Prisma API
 │   ├── prisma/
 │   │   ├── schema.prisma    # Problem, ReviewLog, UserProgress
-│   │   └── seed.ts          # 40 curated problems + simulated history
+│   │   ├── seed.ts          # 40 curated problems + simulated history
+│   │   └── bootstrap.ts     # seeds the local DB on first run if empty
 │   └── src/
-│       ├── index.ts         # Express app + routes + error handler
-│       ├── db.ts            # shared PrismaClient
+│       ├── app.ts           # builds the Express app (routes + error handler)
+│       ├── index.ts         # local dev entry (app.listen)
+│       ├── db.ts            # shared Prisma client (libSQL adapter: file or Turso)
 │       ├── lib/             # ← pure, unit-tested domain logic
 │       │   ├── spacedRepetition.ts   # SM-2 (the heart)
 │       │   ├── mastery.ts            # pattern mastery levels
@@ -237,25 +242,25 @@ npm test
 
 ---
 
-## Deployment
+## Deployment (Vercel-native)
 
-`render.yaml` is a [Render Blueprint](https://render.com/docs/blueprint-spec)
-that deploys the API (Node web service, SQLite on a persistent disk) and the web
-app (static site) together. After connecting the repo on Render:
+LoopCode deploys as a **single Vercel project**: the React app is served
+statically, the Express API runs as a serverless function
+(`api/[...path].ts`), and the database is **Turso** (libSQL) — SQLite over
+HTTPS, which works from serverless functions where a local SQLite file can't
+persist. Because Turso is SQLite-compatible, the Prisma schema and every query
+are unchanged; only the connection differs (`server/src/db.ts` selects Turso via
+`TURSO_*` env vars in production, and a local file otherwise).
 
-1. It builds `server` and `client`.
-2. Set the static site's `VITE_API_URL` to the deployed API URL (the blueprint
-   references `https://loopcode-api.onrender.com`; adjust to your service name).
-3. Seed once from the API service's shell: `npm run db:seed`.
+The frontend calls the API at `/api/*` on the same domain, so there's no CORS or
+API-URL wiring.
 
-For **Vercel**, deploy `client/` as the frontend (see
-[`client/vercel.json`](client/vercel.json) for the SPA rewrite) with
-`VITE_API_URL` pointing at your API host, and host the API separately (Render,
-Fly, Railway).
+**Full step-by-step instructions are in [`DEPLOY_VERCEL.md`](DEPLOY_VERCEL.md)** —
+create a Turso DB, push the schema, seed it, set three env vars in Vercel, and
+deploy.
 
-> ⚠️ SQLite on a single persistent disk is fine for a personal/demo deployment.
-> For a shared, always-on hosted demo, switch Prisma's datasource to Postgres
-> (one-line change) — noted in Future work.
+> Local development is unaffected: `npm install && npm run dev` uses a local
+> SQLite file and seeds itself on first run — no Turso account needed.
 
 ---
 

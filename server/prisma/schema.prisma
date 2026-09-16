@@ -6,7 +6,12 @@
 // reflects the latest reviews.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // driverAdapters lets Prisma talk to libSQL/Turso (SQLite over HTTP) in
+  // production while still using a local SQLite file in development.
+  previewFeatures = ["driverAdapters"]
+  // "native" covers local dev; the rhel target covers Vercel's serverless runtime.
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
